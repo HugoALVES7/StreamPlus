@@ -1,0 +1,9 @@
+build/
+debug.keystore
+config.json
+.DS_Store
+# personal logos (Twitch trademarks): never publish
+personal/
+# plugins dropped in by the user (only the README is published)
+plugins/*
+!plugins/README.md
