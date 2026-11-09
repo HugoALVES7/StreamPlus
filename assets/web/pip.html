@@ -23,16 +23,30 @@
     else o.channel = q.get('channel');
     player = new Twitch.Player('p', o);
     player.addEventListener(Twitch.Player.READY, () => { apply(); setTimeout(kick, 1500); setTimeout(kick, 5000); });
-    player.addEventListener(Twitch.Player.PLAYING, () => { started = true; apply(); });
+    player.addEventListener(Twitch.Player.PLAYING, () => { started = true; apply(); applyQ(); });
     // The embed waits for a click before playing with sound: a real tap in its centre.
-    const kick = () => { if (!started && window.Native) Native.tap(); };
+    const kick = () => { if (!started && !paused && window.Native) Native.tap(); };
     setTimeout(kick, 15000);
   }
-  let started = false;
+  let started = false, paused = false;
   function toTime(s) { s = Math.max(0, s | 0); return Math.floor(s / 3600) + 'h' + Math.floor(s % 3600 / 60) + 'm' + (s % 60) + 's'; }
   function apply() { if (!player) return; player.setVolume(vol); player.setMuted(muted); }
+  // Quality: the best one at or below the cap (720 = "Auto, 720p max" by default; 1080 to force 1080p).
+  let cap = parseInt(q.get('q') || '720', 10), lastQ = null, lastQt = 0;
+  function applyQ() {
+    try {
+      const qs = (player && player.getQualities()) || []; if (!qs.length) return;
+      const ok = qs.filter(x => x.group !== 'auto').map(x => ({ x, h: parseInt(x.name, 10) || 0 })).filter(o => o.h && o.h <= cap).sort((a, b) => b.h - a.h)[0];
+      const target = ok ? (ok.x.group || ok.x.name) : 'auto';
+      if (player.getQuality() === target || (lastQ === target && Date.now() - lastQt < 4000)) return;
+      lastQ = target; lastQt = Date.now(); player.setQuality(target);
+    } catch (e) { }
+  }
+  setInterval(applyQ, 2000);
   window.pip = {
     audio(v, m) { vol = v; muted = m; apply(); },
+    quality(h) { cap = h; lastQ = null; applyQ(); },
+    pause(p) { paused = p; try { if (!player) return; if (p) player.pause(); else player.play(); } catch (e) { } },
     time() { try { return player ? player.getCurrentTime() : 0; } catch (e) { return 0; } }
   };
   init();

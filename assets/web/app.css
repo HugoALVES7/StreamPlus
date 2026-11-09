@@ -459,3 +459,13 @@ h2 { font: 700 34px InterDisplay; margin: 0; letter-spacing: -.005em; }
 .home-top h1 { font: 700 52px InterDisplay; margin: 0; letter-spacing: -.01em; }
 .home-top .upd { color: var(--dim); font-size: 20px; flex: 1; }
 .home-top .btn { height: 60px; font-size: 20px; }
+
+/* narrow cells (3–4 streams with the chat): compact mixer, it never spills into the next cell */
+.slot.narrow .mx { gap: 6px; padding: 8px; }
+.slot.narrow .mx .who { padding: 0 4px; max-width: 56px; }
+.slot.narrow .mx .who span { display: none; }
+.slot.narrow .mx .btn { height: 52px; }
+.slot.narrow .mx .btn.icon { width: 52px; }
+.slot.narrow .mx .btn svg { width: 24px; height: 24px; }
+.slot.narrow .mx .btn.rate { min-width: 64px; height: 52px; padding: 0 10px; font-size: 16px; }
+.slot.narrow .mx .slider { width: 160px; height: 52px; padding: 0 14px; gap: 10px; }

@@ -42,6 +42,8 @@ public class PipService extends Service {
     JSONObject src = new JSONObject();
     float volume = 0.5f;
     boolean muted;
+    /** Paused from the PiP menu (a reload of the player starts it again). */
+    boolean paused;
     int corner = 3;  // 0 top-left, 1 top-right, 2 bottom-left, 3 bottom-right
     int size = 1;    // 0 small, 1 medium, 2 large
     static final float[] SIZES = {0.25f, 0.33f, 0.45f};
@@ -53,6 +55,7 @@ public class PipService extends Service {
     @Override public void onCreate() {
         super.onCreate();
         inst = this;
+        PipKeyService.sync(this);  // the remote's PiP key works while this is open
         wm = (WindowManager) getSystemService(WINDOW_SERVICE);
         prefs = getSharedPreferences("pip", MODE_PRIVATE);
         corner = prefs.getInt("corner", 3);
@@ -102,6 +105,7 @@ public class PipService extends Service {
         if (src.has("time")) b.appendQueryParameter("time", src.optString("time"));
         b.appendQueryParameter("vol", String.valueOf(volume));
         b.appendQueryParameter("muted", muted ? "1" : "0");
+        b.appendQueryParameter("q", String.valueOf(quality()));
         return b.build().toString();
     }
 
@@ -181,8 +185,46 @@ public class PipService extends Service {
         if (web != null) web.evaluateJavascript("window.pip && pip.audio(" + volume + "," + muted + ")", null);
     }
 
+    // ---- PiP quality and low latency (own settings, remembered) ----
+    /** Height cap of the PiP: 720 = "Auto (720p max)" by default, 1080 to force 1080p, or less. */
+    static final int[] QUALITIES = {720, 1080, 480, 360, 160};
+
+    int quality() {
+        return prefs.getInt("quality", 720);
+    }
+
+    static String qualityLabel(int q) {
+        return q == 720 ? "Auto (720p max)" : q + "p";
+    }
+
+    /** Low latency for lives in the PiP (Twitch's player reads it when it starts). */
+    static boolean lowLatency(Context c) {
+        return c.getSharedPreferences("pip", MODE_PRIVATE).getBoolean("lowlat", true);
+    }
+
     void command(String cmd, String arg) {
         switch (cmd) {
+            case "quality": {
+                int q = quality(), i = 0;
+                for (int k = 0; k < QUALITIES.length; k++) if (QUALITIES[k] == q) i = k;
+                q = arg == null || arg.isEmpty() ? QUALITIES[(i + 1) % QUALITIES.length] : Integer.parseInt(arg);
+                prefs.edit().putInt("quality", q).apply();
+                if (web != null) web.evaluateJavascript("window.pip && pip.quality(" + q + ")", null);
+                break;
+            }
+            case "lowlat":
+                prefs.edit().putBoolean("lowlat", arg == null || arg.isEmpty() ? !lowLatency(this) : Boolean.parseBoolean(arg)).commit();
+                // applies when the player starts: reload it (a VOD resumes where it was)
+                if (web != null) {
+                    try { if (time > 0 && src.has("video")) src.put("time", Math.round(time)); } catch (Exception ignored) { }
+                    paused = false;
+                    web.loadUrl(pageUrl());
+                }
+                break;
+            case "pause":
+                paused = arg == null || arg.isEmpty() ? !paused : Boolean.parseBoolean(arg);
+                if (web != null) web.evaluateJavascript("window.pip && pip.pause(" + paused + ")", null);
+                break;
             case "volume":
                 volume = Math.max(0f, Math.min(1f, Float.parseFloat(arg)));
                 if (volume > 0) muted = false;
@@ -238,12 +280,16 @@ public class PipService extends Service {
             o.put("muted", muted);
             o.put("corner", corner);
             o.put("size", size);
+            o.put("quality", quality());
+            o.put("lowlat", lowLatency(this));
+            o.put("paused", paused);
         } catch (Exception ignored) { }
         return o;
     }
 
     @Override public void onDestroy() {
         inst = null;
+        PipKeyService.sync(this);
         if (frame != null) {
             try {
                 wm.removeView(frame);

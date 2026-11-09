@@ -104,8 +104,24 @@ public class MainActivity extends Activity {
     private final android.os.Handler ui = new android.os.Handler(android.os.Looper.getMainLooper());
     private final Runnable okTimer = () -> { okLong = true; js("app.ok(true)"); };
 
+    /** Settings → "Touche du menu PiP": the next button pressed becomes that key. */
+    volatile boolean learningKey;
+
     @Override public boolean dispatchKeyEvent(KeyEvent e) {
         int k = e.getKeyCode();
+        if (learningKey) {
+            if (e.getAction() != KeyEvent.ACTION_DOWN) return true;
+            boolean nav = k == KeyEvent.KEYCODE_DPAD_UP || k == KeyEvent.KEYCODE_DPAD_DOWN || k == KeyEvent.KEYCODE_DPAD_LEFT
+                    || k == KeyEvent.KEYCODE_DPAD_RIGHT || k == KeyEvent.KEYCODE_DPAD_CENTER || k == KeyEvent.KEYCODE_ENTER
+                    || k == KeyEvent.KEYCODE_HOME || k == KeyEvent.KEYCODE_POWER;
+            if (k == KeyEvent.KEYCODE_BACK) { learningKey = false; js("app.keyLearned(0,'')"); return true; }
+            if (nav) return true;  // these keys stay for navigating
+            learningKey = false;
+            PipKeyService.prefs(this).edit().putInt("key", k).commit();
+            PipKeyService.sync(this);
+            js("app.keyLearned(" + k + "," + JSONObject.quote(KeyEvent.keyCodeToString(k).replace("KEYCODE_", "")) + ")");
+            return true;
+        }
         // Long press OK on a card: measured here, before the WebView, whatever the remote sends
         // while the key is held (repeats or not).
         boolean okKey = k == KeyEvent.KEYCODE_DPAD_CENTER || k == KeyEvent.KEYCODE_ENTER || k == KeyEvent.KEYCODE_NUMPAD_ENTER;

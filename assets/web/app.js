@@ -1161,6 +1161,7 @@ VIEWS.pins = async ctx => {
 
 VIEWS.settings = async ctx => {
   const ov = HAS_NATIVE ? Native.canOverlay() : false;
+  const pk = HAS_NATIVE && Native.pipKey ? JSON.parse(Native.pipKey()) : { key: 0 };
   const rows = [
     ['acc', auth ? `Connecté : ${auth.name}` : 'Se connecter avec Twitch', auth ? 'OK pour te déconnecter' : 'Chaînes suivies, lives et rediffusions', auth ? ic('logout') : ''],
     ['pl', HAS_NATIVE && Native.playerSignedIn() ? 'Lecteur connecté à twitch.tv' : 'Connecter le lecteur à twitch.tv', HAS_NATIVE && Native.playerSignedIn() ? 'Rediffusions réservées aux subs, sans pub si abonné · OK pour déconnecter' : 'Pour les rediffusions réservées aux abonnés et les avantages de ton sub', ''],
@@ -1172,6 +1173,7 @@ VIEWS.settings = async ctx => {
     ['chm', 'Chat', cfg.chatMode === 'full' ? 'Chat complet Twitch : envoyer des messages, plus lent à charger' : 'Chat rapide : instantané, lecture seule', cfg.chatMode === 'full' ? 'Complet' : 'Rapide'],
     ['ap', 'PiP automatique', 'Le stream continue en PiP quand tu appuies sur Accueil', cfg.autoPip ? 'Oui' : 'Non'],
     ['ov', 'Lecteur flottant (overlay)', 'Nécessaire pour le Picture in Picture', ov ? 'Autorisé' : 'À autoriser'],
+    ['pk', 'Touche du menu PiP', pk.key ? (pk.enabled ? 'Ouvre le menu du PiP depuis n\'importe quelle app' : 'À activer dans Accessibilité (Paramètres de la TV)') : 'Un bouton de la télécommande qui ouvre le menu du PiP', pk.key ? keyName(pk.name) + (pk.enabled ? '' : ' · inactif') : 'Choisir'],
     ['clr', 'Vider le multistream', multi.length + ' stream(s) enregistré(s)', ''],
     ['ver', APP, 'Version ' + (HAS_NATIVE ? Native.version() : 'web') + ' · Lecteur officiel Twitch + API Helix', ''],
   ];
@@ -1192,9 +1194,40 @@ VIEWS.settings = async ctx => {
   on('chm', () => { cfg.chatMode = cfg.chatMode === 'full' ? 'fast' : 'full'; saveCfg(); re(); });
   on('ap', () => { cfg.autoPip = !cfg.autoPip; saveCfg(); re(); });
   on('ov', () => HAS_NATIVE && Native.requestOverlay());
+  on('pk', () => HAS_NATIVE && pipKeyPanel(re));
   on('clr', () => { multi.forEach(m => m.player = null); multi = []; store.set('multi', []); renderSide(); re(); toast('Multistream vidé'); });
   on('ver', () => toast(APP + ' — fait pour Google TV · application non officielle, non affiliée à Twitch'));
 };
+
+const KEY_NAMES = { PROG_RED: 'Rouge', PROG_GREEN: 'Vert', PROG_YELLOW: 'Jaune', PROG_BLUE: 'Bleu', INFO: 'Info', GUIDE: 'Guide',
+  SETTINGS: 'Paramètres', TV_INPUT: 'Source', CAPTIONS: 'Sous-titres', BOOKMARK: 'Favori', MENU: 'Menu', MEDIA_PLAY_PAUSE: 'Lecture / pause',
+  MEDIA_FAST_FORWARD: 'Avance rapide', MEDIA_REWIND: 'Retour rapide', CHANNEL_UP: 'Chaîne +', CHANNEL_DOWN: 'Chaîne −', LAST_CHANNEL: 'Chaîne précédente',
+  MUTE: 'Muet', VOLUME_MUTE: 'Muet', SEARCH: 'Recherche', ASSIST: 'Assistant', DVR: 'Enregistrer', TV: 'TV', APP_SWITCH: 'Apps récentes' };
+const keyName = n => KEY_NAMES[n] || (/^\d$/.test(n) ? 'Touche ' + n : n);
+/** Settings → "Touche du menu PiP": choose the button, then turn the accessibility service on. */
+function pipKeyPanel(done) {
+  const pk = JSON.parse(Native.pipKey()); pk.name = keyName(pk.name);
+  const steps = `<p class="sub">1. Choisis le bouton de la télécommande.<br>2. Active « ${esc(APP)} · Touche du menu PiP » dans Paramètres de la TV → Système → Accessibilité (seules les touches sont lues).<br>Ensuite, quand un PiP est ouvert, ce bouton ouvre ou ferme son menu, quelle que soit l'app à l'écran. Sans PiP, il garde son action habituelle.</p>`;
+  const l = modal(`<h2>Touche du menu PiP</h2>${steps}
+    <p style="font-size:24px;margin:18px 0">Bouton : <b>${pk.key ? esc(pk.name) : 'aucun'}</b> · Service : <b>${pk.enabled ? 'activé ✓' : 'désactivé'}</b></p>
+    <div class="btns"><div class="btn pri f" tabindex="-1" data-k="learn">${ic('pip')}<span>${pk.key ? 'Changer de bouton' : 'Choisir le bouton'}</span></div>
+    ${pk.enabled ? '' : `<div class="btn glass f" tabindex="-1" data-k="acc">${ic('gear')}<span>Ouvrir Accessibilité</span></div>`}
+    ${pk.key ? `<div class="btn glass f" tabindex="-1" data-k="clr">${ic('x')}<span>Aucun bouton</span></div>` : ''}</div>`, { cls: 'sm' });
+  const on = (k, f) => { const b = $(`[data-k=${k}]`, l.el); if (b) b.onclick = f; };
+  on('learn', () => {
+    $('h2', l.el).textContent = 'Appuie sur le bouton…';
+    $('[data-k=learn] span', l.el).textContent = 'En attente du bouton (Retour pour annuler)';
+    app.keyLearned = (code, name) => {
+      delete app.keyLearned; l.close();
+      if (code) toast('Bouton du menu PiP : ' + keyName(name));
+      done(); if (code) setTimeout(() => pipKeyPanel(done), 300);
+    };
+    Native.learnPipKey();
+  });
+  on('acc', () => { l.close(); Native.openAccessibility(); });
+  on('clr', () => { Native.clearPipKey(); l.close(); done(); });
+  setFocus($('.btn', l.el));
+}
 
 // ======================================================================= login (device code)
 async function login() {
@@ -1802,6 +1835,7 @@ function openMulti(noPicker) {
     multi.forEach((m, i) => {
       const [x, y, w, hh] = r[i];
       Object.assign(m.el.style, { left: x + 'px', top: y + 'px', width: w + 'px', height: hh + 'px' });
+      m.el.classList.toggle('narrow', w < 900);  // e.g. 4 streams + chat: compact mixer that fits its cell
       const e = $('.embed', m.el);
       if (ui) {
         const side = n === 1 ? 170 : chat ? 50 : 104;
@@ -1982,6 +2016,7 @@ const app = window.app = {
     // Leaving the app stops every in-app player (the PiP window lives in its own service).
     if (playerLayer) closePlayer();
     if (multiLayer) { app._stoppedMulti = true; multiLayer.close(); }
+    StreamPlus.emit('app-stop');  // plugins free what they keep loaded in the background
   },
   openExternal(json) {
     let s; try { s = typeof json === 'string' ? JSON.parse(json) : json; } catch (e) { return; }

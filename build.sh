@@ -90,5 +90,7 @@ if [ "${1:-}" = "install" ]; then
     adb -s "$TV" install -r "build/$APK"
     # Floating player (PiP) over other apps: Google TV hides this setting, so grant it here.
     adb -s "$TV" shell appops set "$PACKAGE" SYSTEM_ALERT_WINDOW allow
+    # TCL TVs: lets Android start the app's background services (PiP key) when it isn't open
+    adb -s "$TV" shell appops set "$PACKAGE" AUTO_START allow >/dev/null 2>&1 || true
     adb -s "$TV" shell am start -n "$PACKAGE/com.hugo.streamplus.MainActivity"
 fi

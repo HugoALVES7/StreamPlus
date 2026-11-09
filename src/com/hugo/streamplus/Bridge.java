@@ -200,6 +200,45 @@ final class Bridge {
         return a.getString(R.string.app_name);
     }
 
+    // ---- Remote button for the PiP menu (PipKeyService) ----
+
+    /** {key, name, enabled}: the chosen button and whether its accessibility service is on. */
+    @JavascriptInterface
+    public String pipKey() {
+        int k = PipKeyService.key(a);
+        JSONObject o = new JSONObject();
+        try {
+            o.put("key", k);
+            o.put("name", k == 0 ? "" : android.view.KeyEvent.keyCodeToString(k).replace("KEYCODE_", ""));
+            o.put("enabled", PipKeyService.enabled(a));
+        } catch (Exception ignored) { }
+        return o.toString();
+    }
+
+    /** The next button pressed on the remote becomes the PiP menu key (answer: app.keyLearned). */
+    @JavascriptInterface
+    public void learnPipKey() {
+        if (a instanceof MainActivity) ((MainActivity) a).learningKey = true;
+    }
+
+    @JavascriptInterface
+    public void clearPipKey() {
+        PipKeyService.prefs(a).edit().remove("key").commit();
+        PipKeyService.sync(a);
+    }
+
+    /** Android's accessibility settings, where the user turns the service on. */
+    @JavascriptInterface
+    public void openAccessibility() {
+        a.runOnUiThread(() -> {
+            try {
+                a.startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
+            } catch (Exception e) {
+                a.startActivity(new Intent(Settings.ACTION_SETTINGS));
+            }
+        });
+    }
+
     // ---- Encrypted storage (tokens, twitch.tv session) ----
     private static final String KEY = "streamplus.store";
     private static javax.crypto.SecretKey secret;

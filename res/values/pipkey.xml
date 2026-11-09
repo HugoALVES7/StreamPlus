@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pip_key_label">Touche du menu PiP</string>
+    <string name="pip_key_desc">Quand le lecteur flottant (PiP) est ouvert, la touche de la télécommande choisie dans les paramètres de l\'app ouvre son menu, quelle que soit l\'app à l\'écran. Seules les touches sont lues, rien de ce qui s\'affiche.</string>
+</resources>

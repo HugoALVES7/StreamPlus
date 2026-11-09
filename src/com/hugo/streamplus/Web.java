@@ -93,7 +93,7 @@ final class Web {
 
     private static String hook(Context ctx) {
         return "<script>(function(){"
-            + "try{localStorage.setItem('lowLatencyModeEnabled','" + lowLatency + "');}catch(e){}"
+            + "try{localStorage.setItem('lowLatencyModeEnabled','" + (ctx instanceof PipService ? PipService.lowLatency(ctx) : lowLatency) + "');}catch(e){}"
             + "var r=1;function a(){var v=document.querySelectorAll('video');"
             + "for(var i=0;i<v.length;i++){if(v[i].playbackRate!==r)v[i].playbackRate=r;}}"
             + "function q(t){return document.querySelector('[data-a-target=\"'+t+'\"]');}"

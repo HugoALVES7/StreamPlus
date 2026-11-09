@@ -22,7 +22,7 @@ Client **non officiel** pour regarder Twitch sur Google TV, avec une interface p
 - **Suivre une chaîne** : la page de chaque chaîne indique si tu la suis (« ♥ Suivi », « Ne plus suivre » en rouge une fois sélectionné). L'API de Twitch ne permet plus aux apps de suivre une chaîne : le bouton affiche un QR code qui ouvre la chaîne sur Twitch, pour la suivre depuis ton téléphone, puis l'app relit l'état. Un plugin peut le faire directement dans l'app.
 - **Profils** : chaque profil a son compte Twitch, ses épinglés, son multistream, ses réglages et sa connexion au lecteur twitch.tv. L'app s'ouvre sur le dernier profil utilisé. Pour changer de profil : l'avatar en haut de la barre latérale (ou Paramètres → Profils) ouvre « Qui regarde ? ». Tu peux y ajouter un profil, puis le connecter à un autre compte Twitch, ou en supprimer un (touche Menu sur sa vignette).
 - **Réglages du lecteur (⚙)** : qualité (Source par défaut, Auto ou un plafond 720p/480p…, mémorisée) et faible latence pour les lives (activée par défaut ; l'app la règle dans le lecteur Twitch via `lowLatencyModeEnabled`).
-- **Picture in Picture** : une fenêtre flottante reste au-dessus de toutes les apps, y compris Hume. Seul le son se règle, depuis la tuile **Stream+ PiP** ou l'entrée PiP de la barre latérale. On peut aussi déplacer la fenêtre, changer sa taille, revenir en plein écran ou la fermer. Le bouton Accueil pendant un live bascule automatiquement en PiP (réglable).
+- **Picture in Picture** : une fenêtre flottante reste au-dessus de toutes les apps, y compris Hume. Son menu s'ouvre depuis la tuile **Stream+ PiP**, l'entrée PiP de la barre latérale ou un bouton de la télécommande au choix (Paramètres → Touche du menu PiP, via un service d'accessibilité qui ne lit que les touches). On y règle le son, la pause, la qualité (Auto 720p max, 1080p ou moins) et la faible latence, et on peut aussi déplacer la fenêtre, changer sa taille, revenir en plein écran ou la fermer. Le bouton Accueil pendant un live bascule automatiquement en PiP (réglable).
 - **Épingles** : épingle une chaîne depuis sa page, le lecteur ou le menu d'une carte (touche Menu). Elles apparaissent dans la barre latérale avec leur statut live. CH+ / CH− dans le lecteur passe d'un épinglé en direct à l'autre.
 
 ## Comment ça marche
@@ -121,7 +121,8 @@ src/com/hugo/streamplus/
   Web.java                 réglages WebView et service des assets en https local
   Bridge.java              window.Native : HTTP, QR, PiP, taps, maintien de l'écran allumé
   PipService.java          lecteur flottant overlay
-  PipControlActivity.java  panneau glass du PiP (volume, muet, position, taille)
+  PipControlActivity.java  panneau glass du PiP (pause, volume, qualité, faible latence, position, taille)
+  PipKeyService.java       bouton de télécommande qui ouvre le menu du PiP (accessibilité, processus à part)
   LoginActivity.java       page de connexion twitch.tv du lecteur
   Plugin.java              interface des plugins (plugins/)
 src/io/nayuki/qrcodegen/   générateur de QR codes (MIT, Project Nayuki)

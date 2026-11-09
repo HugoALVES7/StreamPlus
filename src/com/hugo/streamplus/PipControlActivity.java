@@ -31,10 +31,13 @@ import org.json.JSONObject;
  * size of the card, so the system blurs just what's behind the card.
  */
 public class PipControlActivity extends Activity {
+    /** The panel while it is shown (the PiP key closes it). */
+    static PipControlActivity open;
+
     private float u;  // 1/960 of the screen width
     private Typeface regular, semibold, display;
     private TextView volLabel;
-    private Button muteBtn;
+    private Button muteBtn, pauseBtn;
     private SeekBar seek;
 
     private int px(float units) {
@@ -51,6 +54,7 @@ public class PipControlActivity extends Activity {
 
     @Override protected void onCreate(Bundle b) {
         super.onCreate(b);
+        open = this;
         Point p = new Point();
         getWindowManager().getDefaultDisplay().getRealSize(p);
         u = Math.max(p.x, p.y) / 960f;
@@ -178,9 +182,14 @@ public class PipControlActivity extends Activity {
         title.setPadding(0, px(3), 0, px(12));
         root.addView(title);
 
-        // Volume row: [mute] [=====] 65 %
+        // Volume row: [pause] [mute] [=====] 65 %
         LinearLayout vol = new LinearLayout(this);
         vol.setGravity(Gravity.CENTER_VERTICAL);
+        pauseBtn = pill("Pause", v -> {
+            s.command("pause", "");
+            refresh();
+        });
+        vol.addView(pauseBtn);
         muteBtn = pill("Muet", v -> {
             s.command("mute", "");
             refresh();
@@ -223,6 +232,25 @@ public class PipControlActivity extends Activity {
         TextView hint = text("◀ ▶ règle le son du stream", regular, 9, 0x80FFFFFF);
         hint.setPadding(0, px(6), 0, px(12));
         root.addView(hint);
+
+        // Quality (Auto = 720p max) and low latency of the PiP
+        LinearLayout opts = new LinearLayout(this);
+        Button qb = pill("Qualité : " + PipService.qualityLabel(st.optInt("quality", 720)), null);
+        qb.setOnClickListener(v -> {
+            s.command("quality", "");
+            qb.setText("Qualité : " + PipService.qualityLabel(s.quality()));
+        });
+        opts.addView(qb);
+        if (!st.has("video")) {
+            Button lb = pill("Faible latence : " + (st.optBoolean("lowlat", true) ? "oui" : "non"), null);
+            lb.setOnClickListener(v -> {
+                s.command("lowlat", "");
+                lb.setText("Faible latence : " + (PipService.lowLatency(this) ? "oui" : "non"));
+            });
+            opts.addView(lb);
+        }
+        opts.setPadding(0, 0, 0, px(10));
+        root.addView(opts);
 
         LinearLayout row = new LinearLayout(this);
         row.addView(pill("Déplacer", v -> s.command("corner", "")));
@@ -267,14 +295,26 @@ public class PipControlActivity extends Activity {
         if (seek.getProgress() != v) seek.setProgress(v);
         volLabel.setText(s.muted ? "Muet" : v + " %");
         muteBtn.setText(s.muted ? "Activer le son" : "Muet");
+        pauseBtn.setText(s.paused ? "Reprendre" : "Pause");
     }
 
     @Override public boolean onKeyDown(int k, KeyEvent e) {
         if (k == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE && PipService.inst != null) {
-            PipService.inst.command("mute", "");
+            PipService.inst.command("pause", "");
             refresh();
             return true;
         }
         return super.onKeyDown(k, e);
+    }
+
+    /** The PiP key pressed again (PipKeyService): closes the menu. */
+    @Override protected void onNewIntent(android.content.Intent i) {
+        super.onNewIntent(i);
+        if (i != null && i.getBooleanExtra("toggle", false)) finish();
+    }
+
+    @Override protected void onDestroy() {
+        if (open == this) open = null;
+        super.onDestroy();
     }
 }
